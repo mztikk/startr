@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
-    process::Output,
+    process::Child,
 };
 use structopt::StructOpt;
 
@@ -14,6 +14,8 @@ enum CommandType {
         command: String,
         working_directory: Option<String>,
         args: Option<Vec<String>>,
+        #[serde(default = "bool::default")]
+        spawn_only: bool,
     },
 }
 
@@ -31,24 +33,26 @@ struct Cli {
 
 struct ExecutionResult {
     command: String,
-    result: std::result::Result<Output, std::io::Error>,
+    child: std::result::Result<Child, std::io::Error>,
+    wait: bool,
 }
 
 fn run(command: &CommandType) -> ExecutionResult {
     match command {
         CommandType::Command(cmd) => {
             if cfg!(target_os = "windows") {
+                let child = std::process::Command::new("cmd").arg("/C").arg(cmd).spawn();
                 return ExecutionResult {
                     command: cmd.to_string(),
-                    result: std::process::Command::new("cmd")
-                        .arg("/C")
-                        .arg(cmd)
-                        .output(),
+                    child,
+                    wait: true,
                 };
             } else {
+                let child = std::process::Command::new("sh").arg("-c").arg(cmd).spawn();
                 return ExecutionResult {
                     command: cmd.to_string(),
-                    result: std::process::Command::new("sh").arg("-c").arg(cmd).output(),
+                    child,
+                    wait: true,
                 };
             }
         }
@@ -56,20 +60,23 @@ fn run(command: &CommandType) -> ExecutionResult {
             command,
             working_directory,
             args,
+            spawn_only,
         } => {
             let cmd = format!("{} in {:?} with {:?}", command, working_directory, &args);
+            let child = std::process::Command::new(command)
+                .current_dir(
+                    working_directory
+                        .as_ref()
+                        .map_or(std::env::current_dir().unwrap(), |d| {
+                            Path::new(&d).to_path_buf()
+                        }),
+                )
+                .args(args.as_ref().unwrap_or(&Vec::new()))
+                .spawn();
             return ExecutionResult {
                 command: cmd,
-                result: std::process::Command::new(command)
-                    .current_dir(
-                        working_directory
-                            .as_ref()
-                            .map_or(std::env::current_dir().unwrap(), |d| {
-                                Path::new(&d).to_path_buf()
-                            }),
-                    )
-                    .args(args.as_ref().unwrap_or(&Vec::new()))
-                    .output(),
+                child,
+                wait: !spawn_only,
             };
         }
     }
@@ -96,7 +103,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!(
                     "{}:\n{}",
                     result.command,
-                    String::from_utf8_lossy(&result.result?.stdout)
+                    if result.wait {
+                        String::from_utf8_lossy(&result.child?.wait_with_output()?.stdout)
+                            .to_string()
+                    } else {
+                        "spawned".to_string()
+                    }
                 );
             }
             Command::Parallel(cmds) => {
@@ -105,7 +117,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!(
                         "{}:\n{}",
                         result.command,
-                        String::from_utf8_lossy(&result.result.unwrap().stdout)
+                        if result.wait {
+                            String::from_utf8_lossy(
+                                &result.child.unwrap().wait_with_output().unwrap().stdout,
+                            )
+                            .to_string()
+                        } else {
+                            "spawned".to_string()
+                        }
                     );
                 });
             }
