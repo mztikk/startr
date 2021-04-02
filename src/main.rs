@@ -1,26 +1,11 @@
 use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::io::Error;
 use std::{
-    env,
     path::{Path, PathBuf},
     process::Output,
 };
 use structopt::StructOpt;
-
-#[derive(Debug)]
-enum ProgError {
-    NoFile,
-    NotUtf8,
-    Io(Error),
-}
-
-impl From<Error> for ProgError {
-    fn from(err: Error) -> ProgError {
-        ProgError::Io(err)
-    }
-}
 
 #[derive(Deserialize, Serialize)]
 enum CommandType {
@@ -90,24 +75,12 @@ fn run(command: &CommandType) -> ExecutionResult {
     }
 }
 
-fn binary() -> Result<String, ProgError> {
-    let path = env::current_exe()?;
-    let name = path.file_name().ok_or(ProgError::NoFile)?;
-    let s_name = name.to_str().ok_or(ProgError::NotUtf8)?;
-    Ok(s_name.to_owned())
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::from_args();
 
     let config_file = match args.config {
         Some(path) => path,
-        None => {
-            let mut path = std::env::current_exe().unwrap();
-            path.pop();
-            path.push(format!("{}.yaml", binary().unwrap()));
-            path
-        }
+        None => std::env::current_exe()?.with_extension("yaml"),
     };
 
     println!("{}", config_file.to_string_lossy());
