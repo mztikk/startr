@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::io::Error;
 use std::{
     env,
-    fs::OpenOptions,
-    io::Read,
     path::{Path, PathBuf},
     process::Output,
 };
