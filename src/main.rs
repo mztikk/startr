@@ -1,3 +1,4 @@
+use core::fmt;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -13,10 +14,28 @@ enum CommandType {
     Execution {
         command: String,
         working_directory: Option<String>,
-        args: Option<Vec<String>>,
+        #[serde(default = "Vec::new")]
+        args: Vec<String>,
         #[serde(default = "bool::default")]
         spawn_only: bool,
     },
+}
+
+impl fmt::Display for CommandType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandType::Command(cmd) => f.write_str(&cmd),
+            CommandType::Execution {
+                command,
+                working_directory,
+                args,
+                spawn_only,
+            } => f.write_str(&format!(
+                "{} in {:?} with {:?}",
+                command, working_directory, &args
+            )),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -32,7 +51,6 @@ struct Cli {
 }
 
 struct ExecutionResult {
-    command: String,
     child: std::result::Result<Child, std::io::Error>,
     wait: bool,
 }
@@ -42,18 +60,10 @@ fn run(command: &CommandType) -> ExecutionResult {
         CommandType::Command(cmd) => {
             if cfg!(target_os = "windows") {
                 let child = std::process::Command::new("cmd").arg("/C").arg(cmd).spawn();
-                return ExecutionResult {
-                    command: cmd.to_string(),
-                    child,
-                    wait: true,
-                };
+                return ExecutionResult { child, wait: true };
             } else {
                 let child = std::process::Command::new("sh").arg("-c").arg(cmd).spawn();
-                return ExecutionResult {
-                    command: cmd.to_string(),
-                    child,
-                    wait: true,
-                };
+                return ExecutionResult { child, wait: true };
             }
         }
         CommandType::Execution {
@@ -62,7 +72,6 @@ fn run(command: &CommandType) -> ExecutionResult {
             args,
             spawn_only,
         } => {
-            let cmd = format!("{} in {:?} with {:?}", command, working_directory, &args);
             let child = std::process::Command::new(command)
                 .current_dir(
                     working_directory
@@ -71,10 +80,9 @@ fn run(command: &CommandType) -> ExecutionResult {
                             Path::new(&d).to_path_buf()
                         }),
                 )
-                .args(args.as_ref().unwrap_or(&Vec::new()))
+                .args(args)
                 .spawn();
             return ExecutionResult {
-                command: cmd,
                 child,
                 wait: !spawn_only,
             };
@@ -99,10 +107,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for command in commands {
         match command {
             Command::Single(cmd) => {
+                println!("{}", cmd);
                 let result = run(&cmd);
                 println!(
-                    "{}:\n{}",
-                    result.command,
+                    "{}",
                     if result.wait {
                         String::from_utf8_lossy(&result.child?.wait_with_output()?.stdout)
                             .to_string()
@@ -113,10 +121,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Command::Parallel(cmds) => {
                 cmds.par_iter().for_each(|cmd| {
+                    println!("{}", cmd);
                     let result = run(&cmd);
                     println!(
-                        "{}:\n{}",
-                        result.command,
+                        "{}",
                         if result.wait {
                             String::from_utf8_lossy(
                                 &result.child.unwrap().wait_with_output().unwrap().stdout,
