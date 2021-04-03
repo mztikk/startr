@@ -24,16 +24,13 @@ enum CommandType {
 impl fmt::Display for CommandType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CommandType::Command(cmd) => f.write_str(&cmd),
+            CommandType::Command(cmd) => write!(f, "{}", cmd),
             CommandType::Execution {
                 command,
                 working_directory,
                 args,
                 spawn_only,
-            } => f.write_str(&format!(
-                "{} in {:?} with {:?}",
-                command, working_directory, &args
-            )),
+            } => write!(f, "{} in {:?} with {:?}", command, working_directory, &args),
         }
     }
 }
