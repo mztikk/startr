@@ -58,7 +58,7 @@ struct ExecutionResult {
 fn run(command: &CommandType) -> ExecutionResult {
     match command {
         CommandType::Command(cmd) => {
-            if cfg!(target_os = "windows") {
+            if cfg!(windows) {
                 let child = std::process::Command::new("cmd").arg("/C").arg(cmd).spawn();
                 return ExecutionResult { child, wait: true };
             } else {
