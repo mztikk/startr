@@ -52,16 +52,25 @@ struct ExecutionResult {
     wait: bool,
 }
 
+fn shell_command() -> std::process::Command {
+    if cfg!(windows) {
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.arg("/C");
+        cmd
+    } else {
+        let mut cmd = std::process::Command::new("sh");
+        cmd.arg("-c");
+        cmd
+    }
+}
+
 fn run(command: &CommandType) -> ExecutionResult {
     match command {
         CommandType::Command(cmd) => {
-            if cfg!(windows) {
-                let child = std::process::Command::new("cmd").arg("/C").arg(cmd).spawn();
-                return ExecutionResult { child, wait: true };
-            } else {
-                let child = std::process::Command::new("sh").arg("-c").arg(cmd).spawn();
-                return ExecutionResult { child, wait: true };
-            }
+            return ExecutionResult {
+                child: shell_command().arg(cmd).spawn(),
+                wait: true,
+            };
         }
         CommandType::Execution {
             command,
