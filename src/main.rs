@@ -30,7 +30,7 @@ impl fmt::Display for CommandType {
                 working_directory,
                 args,
                 spawn_only,
-            } => write!(f, "{} in {:?} with {:?}", command, working_directory, &args),
+            } => write!(f, "{} in {:?} with {:?}", command, working_directory, args),
         }
     }
 }
@@ -74,7 +74,7 @@ fn run(command: &CommandType) -> ExecutionResult {
                     working_directory
                         .as_ref()
                         .map_or(std::env::current_dir().unwrap(), |d| {
-                            Path::new(&d).to_path_buf()
+                            Path::new(d).to_path_buf()
                         }),
                 )
                 .args(args)
