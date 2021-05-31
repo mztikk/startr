@@ -29,7 +29,7 @@ impl fmt::Display for CommandType {
                 command,
                 working_directory,
                 args,
-                spawn_only,
+                spawn_only: _,
             } => write!(f, "{} in {:?} with {:?}", command, working_directory, args),
         }
     }
@@ -88,10 +88,10 @@ fn run(command: &CommandType) -> ExecutionResult {
                 )
                 .args(args)
                 .spawn();
-            return ExecutionResult {
+            ExecutionResult {
                 child,
                 wait: !spawn_only,
-            };
+            }
         }
     }
 }
