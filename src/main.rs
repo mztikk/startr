@@ -1,3 +1,4 @@
+use clap::Parser;
 use core::fmt;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
@@ -6,7 +7,6 @@ use std::{
     path::{Path, PathBuf},
     process::Child,
 };
-use structopt::StructOpt;
 
 #[derive(Deserialize, Serialize)]
 enum CommandType {
@@ -41,9 +41,9 @@ enum Command {
     Parallel(Vec<CommandType>),
 }
 
-#[derive(StructOpt)]
+#[derive(Parser, Debug)]
 struct Cli {
-    #[structopt(parse(from_os_str))]
+    #[clap(parse(from_os_str))]
     config: Option<PathBuf>,
 }
 
@@ -97,7 +97,7 @@ fn run(command: &CommandType) -> ExecutionResult {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Cli::from_args();
+    let args = Cli::parse();
 
     let config_file = match args.config {
         Some(path) => path,
@@ -121,14 +121,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         String::from_utf8_lossy(&result.child?.wait_with_output()?.stdout)
                             .to_string()
                     } else {
-                        "spawned".to_string()
+                        format!("spawned {}", cmd)
                     }
                 );
             }
             Command::Parallel(cmds) => {
                 cmds.par_iter().for_each(|cmd| {
                     println!("{}", cmd);
-                    let result = run(&cmd);
+                    let result = run(cmd);
                     println!(
                         "{}",
                         if result.wait {
@@ -137,7 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             )
                             .to_string()
                         } else {
-                            "spawned".to_string()
+                            format!("spawned {}", cmd)
                         }
                     );
                 });
